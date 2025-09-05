@@ -1,10 +1,12 @@
-# 🚀 SSH vào Termux qua Cloudflare Tunnel
+# 🚀 SSH & MariaDB qua Cloudflare Tunnel
 
-Hướng dẫn này giúp bạn mở **SSH server trên Termux**, tạo tunnel bằng **Cloudflare**, và kết nối từ **PC Windows**.
+Hướng dẫn này giúp bạn mở **SSH server** và **MariaDB server** trên Termux, tạo tunnel bằng **Cloudflare**, và kết nối từ **PC Windows** (bao gồm cả **DBeaver**).
 
 ---
 
 ## 📱 Cài đặt và cấu hình trên điện thoại (Termux)
+
+### 1. SSH
 
 1. **Cài đặt OpenSSH**
 
@@ -19,78 +21,121 @@ Hướng dẫn này giúp bạn mở **SSH server trên Termux**, tạo tunnel b
    passwd
    ```
 
-   👉 Nhớ mật khẩu để đăng nhập sau này.
-
 3. **Khởi động SSH server trên cổng 8022**
 
    ```bash
    sshd -p 8022
    ```
 
-4. **Cài đặt Cloudflared**
+### 2. MariaDB
+
+1. **Cài đặt MariaDB**
 
    ```bash
-   pkg install cloudflared -y
+   pkg install mariadb -y
    ```
 
-5. **Tạo tunnel TCP cho SSH**
+2. **Khởi động MariaDB**
 
    ```bash
-   cloudflared tunnel --url tcp://localhost:8022
+   mysqld_safe &
    ```
 
-   Sau khi chạy, bạn sẽ nhận được một URL dạng:
+3. **Truy cập MariaDB**
 
-   ```
-   https://example-random-tunnel.trycloudflare.com
+   ```bash
+   mysql -u root -p
    ```
 
-   👉 Copy lại `hostname` này để dùng trên PC.
+4. **Tạo user để kết nối từ DBeaver**
+
+   ```sql
+   CREATE USER 'dbeaver'@'%' IDENTIFIED BY 'password123';
+   GRANT ALL PRIVILEGES ON *.* TO 'dbeaver'@'%' WITH GRANT OPTION;
+   FLUSH PRIVILEGES;
+   ```
+
+### 3. Cài đặt Cloudflared
+
+```bash
+pkg install cloudflared -y
+```
+
+#### Tạo tunnel cho SSH
+
+```bash
+cloudflared tunnel --url tcp://localhost:8022
+```
+
+#### Tạo tunnel cho MariaDB
+
+```bash
+cloudflared tunnel --url tcp://localhost:3306
+```
+
+👉 Mỗi lệnh sẽ trả về một **hostname** dạng:
+
+```
+https://example-random-tunnel.trycloudflare.com
+```
+
+Copy lại để dùng trên PC.
 
 ---
 
 ## 💻 Trên máy tính (Windows)
 
-1. **Tải Cloudflared cho Windows**
-   Mở PowerShell và chạy:
+### 1. Tải Cloudflared cho Windows
 
-   ```powershell
-   Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
-   ```
+```powershell
+Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
+```
 
-2. **Chạy Cloudflared client để kết nối tunnel**
-   Trong thư mục chứa `cloudflared.exe`:
+### 2. Chạy Cloudflared client
 
-   ```powershell
-   .\cloudflared.exe access tcp --hostname <hostname_từ_termux> --url localhost:8022
-   ```
+#### Cho SSH
 
-   Ví dụ:
+```powershell
+.\cloudflared.exe access tcp --hostname <hostname_từ_termux> --url localhost:8022
+```
 
-   ```powershell
-   .\cloudflared.exe access tcp --hostname example-random-tunnel.trycloudflare.com --url localhost:8022
-   ```
+#### Cho MariaDB
 
-3. **SSH vào Termux qua tunnel**
-   Mở PowerShell khác:
+```powershell
+.\cloudflared.exe access tcp --hostname <hostname_từ_termux> --url localhost:3306
+```
 
-   ```powershell
-   ssh -p 8022 u0_a529@localhost
-   ```
+### 3. SSH vào Termux
 
-   * `u0_a529` là username trong Termux (xem bằng `whoami` trong Termux).
-   * Nhập mật khẩu đã đặt ở bước `passwd`.
+```powershell
+ssh -p 8022 u0_a529@localhost
+```
+
+* `u0_a529` là username trong Termux (xem bằng `whoami`).
+* Nhập mật khẩu đã đặt bằng `passwd`.
+
+### 4. Kết nối DBeaver tới MariaDB
+
+* **Database type:** MariaDB
+* **Host:** `localhost`
+* **Port:** `3306`
+* **Username:** `dbeaver` (hoặc user bạn tạo)
+* **Password:** `password123`
+
+👉 Nhấn **Test Connection** → nếu thấy OK thì Save lại.
 
 ---
 
 ## 🎯 Kết quả
 
-* Bạn đã kết nối thành công vào **Termux trên Android** từ **PC Windows** qua **Cloudflare Tunnel**.
-* Không cần mở port trên router, hoạt động ở mọi nơi có Internet.
+* Kết nối thành công **SSH từ Windows → Termux** qua Cloudflare Tunnel.
+* Quản lý **MariaDB trên Termux** bằng **DBeaver** trên Windows.
+* Hoạt động ở mọi nơi có Internet, không cần mở port router.
 
 ---
 
 ## ⚡ Tips
 
 * Dùng `whoami` trong Termux để biết username (ví dụ: `u0_a529`).
-
+* Luôn chạy lại `cloudflared tunnel` mỗi khi khởi động mới Termux.
+* Có thể viết script `.sh` (Termux) và `.bat` (Windows) để tự động hóa.
